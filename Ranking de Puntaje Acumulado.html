@@ -1,0 +1,341 @@
+<!-- POLLA MUNDIALISTA 2026 - DASHBOARD EN VIVO -->
+<style>
+  :root {
+    --bg: #0b1220;
+    --card: #121b2e;
+    --card2: #1a2740;
+    --accent: #22c55e;
+    --accent2: #facc15;
+    --text: #e6edf7;
+    --muted: #93a4c3;
+    --border: #25334f;
+  }
+  * { box-sizing: border-box; }
+  body, .pm-root { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  .pm-root {
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    border-radius: 12px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .pm-header {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .pm-header h1 {
+    font-size: 1.4rem;
+    margin: 0;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .pm-header p { color: var(--muted); font-size: 0.85rem; margin: 4px 0 0; }
+
+  .pm-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .pm-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .pm-tab.active {
+    background: var(--accent);
+    color: #06210f;
+    border-color: var(--accent);
+  }
+
+  .pm-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  /* Ranking */
+  table.pm-rank { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  table.pm-rank th, table.pm-rank td {
+    padding: 8px 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  table.pm-rank th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
+  table.pm-rank td.pts { font-weight: 800; color: var(--accent2); text-align: right; }
+  table.pm-rank td.pos { color: var(--muted); width: 28px; }
+  .pm-medal { font-size: 1rem; }
+
+  /* Groups / matches */
+  .pm-group-title {
+    font-weight: 700;
+    margin: 10px 0 6px;
+    color: var(--accent2);
+    font-size: 0.95rem;
+  }
+  .pm-match {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+  }
+  .pm-match:last-child { border-bottom: none; }
+  .pm-team { flex: 1; }
+  .pm-team.right { text-align: right; }
+  .pm-score-input {
+    width: 38px;
+    text-align: center;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 1rem;
+    padding: 6px 0;
+  }
+  .pm-score-input:focus { outline: 2px solid var(--accent); }
+  .pm-vs { color: var(--muted); font-size: 0.8rem; padding: 0 2px; }
+  .pm-played-badge {
+    font-size: 0.65rem;
+    background: var(--accent);
+    color: #06210f;
+    border-radius: 6px;
+    padding: 2px 6px;
+    margin-left: 6px;
+    font-weight: 700;
+  }
+  .pm-progress {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .pm-clear-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 6px;
+  }
+  .pm-detail-row { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted); padding: 4px 0; }
+  .pm-name-pts { display:flex; justify-content: space-between; align-items:center; }
+  .pm-name-pts span { color: #ffffff; font-weight: 600; }
+</style>
+
+<div class="pm-root" id="pm-root">
+  <div class="pm-header">
+    <h1>🏆 Polla Mundialista 2026</h1>
+    <p>Fase de grupos · Actualizado manualmente</p>
+  </div>
+
+  <div class="pm-tabs">
+    <div class="pm-tab active" data-tab="ranking">Ranking</div>
+    <div class="pm-tab" data-tab="partidos">Partidos</div>
+  </div>
+
+  <div id="pm-progress" class="pm-progress"></div>
+
+  <div id="pm-view-ranking" class="pm-card"></div>
+  <div id="pm-view-partidos" class="pm-card" style="display:none;"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDZo1ZjUsu7R4ZUm6TSKAO6wwPwxx56Q08",
+  authDomain: "ranking-de-puntaje-acumulado.firebaseapp.com",
+  databaseURL: "https://ranking-de-puntaje-acumulado-default-rtdb.firebaseio.com",
+  projectId: "ranking-de-puntaje-acumulado",
+  storageBucket: "ranking-de-puntaje-acumulado.firebasestorage.app",
+  messagingSenderId: "981203667009",
+  appId: "1:981203667009:web:73f164031047880c9fdec0"
+};
+firebase.initializeApp(firebaseConfig);
+const pmDb = firebase.database();
+</script>
+<script>
+const MATCHES = [["Grupo A", "🇲🇽 México", "🇿🇦 Sudáfrica"], ["Grupo A", "🇲🇽 México", "🇰🇷 Corea del Sur"], ["Grupo A", "🇲🇽 México", "🇨🇿 Chequia"], ["Grupo A", "🇿🇦 Sudáfrica", "🇰🇷 Corea del Sur"], ["Grupo A", "🇿🇦 Sudáfrica", "🇨🇿 Chequia"], ["Grupo A", "🇰🇷 Corea del Sur", "🇨🇿 Chequia"], ["Grupo B", "🇨🇦 Canadá", "🇧🇦 Bosnia y Herzegovina"], ["Grupo B", "🇨🇦 Canadá", "🇶🇦 Catar"], ["Grupo B", "🇨🇦 Canadá", "🇨🇭 Suiza"], ["Grupo B", "🇧🇦 Bosnia y Herzegovina", "🇶🇦 Catar"], ["Grupo B", "🇧🇦 Bosnia y Herzegovina", "🇨🇭 Suiza"], ["Grupo B", "🇶🇦 Catar", "🇨🇭 Suiza"], ["Grupo C", "🇧🇷 Brasil", "🇲🇦 Marruecos"], ["Grupo C", "🇧🇷 Brasil", "🇭🇹 Haití"], ["Grupo C", "🇧🇷 Brasil", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia"], ["Grupo C", "🇲🇦 Marruecos", "🇭🇹 Haití"], ["Grupo C", "🇲🇦 Marruecos", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia"], ["Grupo C", "🇭🇹 Haití", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia"], ["Grupo D", "🇺🇸 Estados Unidos", "🇵🇾 Paraguay"], ["Grupo D", "🇺🇸 Estados Unidos", "🇦🇺 Australia"], ["Grupo D", "🇺🇸 Estados Unidos", "🇹🇷 Turquía"], ["Grupo D", "🇵🇾 Paraguay", "🇦🇺 Australia"], ["Grupo D", "🇵🇾 Paraguay", "🇹🇷 Turquía"], ["Grupo D", "🇦🇺 Australia", "🇹🇷 Turquía"], ["Grupo E", "🇩🇪 Alemania", "🇨🇼 Curazao"], ["Grupo E", "🇩🇪 Alemania", "🇨🇮 Costa de Marfil"], ["Grupo E", "🇩🇪 Alemania", "🇪🇨 Ecuador"], ["Grupo E", "🇨🇼 Curazao", "🇨🇮 Costa de Marfil"], ["Grupo E", "🇨🇼 Curazao", "🇪🇨 Ecuador"], ["Grupo E", "🇨🇮 Costa de Marfil", "🇪🇨 Ecuador"], ["Grupo F", "🇳🇱 Países Bajos", "🇯🇵 Japón"], ["Grupo F", "🇳🇱 Países Bajos", "🇸🇪 Suecia"], ["Grupo F", "🇳🇱 Países Bajos", "🇹🇳 Túnez"], ["Grupo F", "🇯🇵 Japón", "🇸🇪 Suecia"], ["Grupo F", "🇯🇵 Japón", "🇹🇳 Túnez"], ["Grupo F", "🇸🇪 Suecia", "🇹🇳 Túnez"], ["Grupo G", "🇧🇪 Bélgica", "🇪🇬 Egipto"], ["Grupo G", "🇧🇪 Bélgica", "🇮🇷 Irán"], ["Grupo G", "🇧🇪 Bélgica", "🇳🇿 Nueva Zelanda"], ["Grupo G", "🇪🇬 Egipto", "🇮🇷 Irán"], ["Grupo G", "🇪🇬 Egipto", "🇳🇿 Nueva Zelanda"], ["Grupo G", "🇮🇷 Irán", "🇳🇿 Nueva Zelanda"], ["Grupo H", "🇪🇸 España", "🇨🇻 Cabo Verde"], ["Grupo H", "🇪🇸 España", "🇸🇦 Arabia Saudita"], ["Grupo H", "🇪🇸 España", "🇺🇾 Uruguay"], ["Grupo H", "🇨🇻 Cabo Verde", "🇸🇦 Arabia Saudita"], ["Grupo H", "🇨🇻 Cabo Verde", "🇺🇾 Uruguay"], ["Grupo H", "🇸🇦 Arabia Saudita", "🇺🇾 Uruguay"], ["Grupo I", "🇫🇷 Francia", "🇸🇳 Senegal"], ["Grupo I", "🇫🇷 Francia", "🇮🇶 Irak"], ["Grupo I", "🇫🇷 Francia", "🇳🇴 Noruega"], ["Grupo I", "🇸🇳 Senegal", "🇮🇶 Irak"], ["Grupo I", "🇸🇳 Senegal", "🇳🇴 Noruega"], ["Grupo I", "🇮🇶 Irak", "🇳🇴 Noruega"], ["Grupo J", "🇦🇷 Argentina", "🇩🇿 Argelia"], ["Grupo J", "🇦🇷 Argentina", "🇦🇹 Austria"], ["Grupo J", "🇦🇷 Argentina", "🇯🇴 Jordania"], ["Grupo J", "🇩🇿 Argelia", "🇦🇹 Austria"], ["Grupo J", "🇩🇿 Argelia", "🇯🇴 Jordania"], ["Grupo J", "🇦🇹 Austria", "🇯🇴 Jordania"], ["Grupo K", "🇵🇹 Portugal", "🇨🇩 RD Congo"], ["Grupo K", "🇵🇹 Portugal", "🇺🇿 Uzbekistán"], ["Grupo K", "🇵🇹 Portugal", "🇨🇴 Colombia"], ["Grupo K", "🇨🇩 RD Congo", "🇺🇿 Uzbekistán"], ["Grupo K", "🇨🇩 RD Congo", "🇨🇴 Colombia"], ["Grupo K", "🇺🇿 Uzbekistán", "🇨🇴 Colombia"], ["Grupo L", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra", "🇭🇷 Croacia"], ["Grupo L", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra", "🇬🇭 Ghana"], ["Grupo L", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra", "🇵🇦 Panamá"], ["Grupo L", "🇭🇷 Croacia", "🇬🇭 Ghana"], ["Grupo L", "🇭🇷 Croacia", "🇵🇦 Panamá"], ["Grupo L", "🇬🇭 Ghana", "🇵🇦 Panamá"]];
+const PREDS = {"Jennifer Lau": [[2, 0], [1, 1], [1, 0], [1, 2], [1, 2], [1, 1], [1, 0], [2, 0], [1, 2], [2, 0], [1, 3], [0, 2], [2, 1], [3, 0], [3, 1], [2, 0], [2, 1], [1, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 2], [1, 2], [4, 0], [3, 1], [1, 1], [0, 2], [0, 2], [1, 2], [1, 2], [1, 0], [2, 0], [0, 1], [2, 1], [2, 0], [1, 0], [2, 0], [2, 0], [1, 0], [2, 1], [1, 1], [4, 0], [3, 0], [2, 1], [0, 1], [0, 2], [1, 2], [2, 0], [3, 0], [2, 2], [2, 0], [0, 1], [1, 3], [2, 0], [1, 0], [3, 0], [1, 1], [1, 0], [2, 0], [3, 0], [2, 0], [0, 1], [0, 1], [0, 2], [0, 3], [3, 1], [2, 0], [4, 1], [1, 1], [2, 0], [1, 0]], "Alanis Figueroa": [[2, 1], [1, 1], [2, 1], [0, 2], [0, 1], [1, 1], [2, 1], [3, 0], [1, 1], [1, 1], [1, 1], [0, 2], [2, 1], [5, 0], [3, 0], [2, 0], [1, 1], [1, 3], [2, 1], [1, 1], [1, 2], [1, 0], [1, 1], [0, 2], [4, 0], [2, 1], [2, 1], [0, 3], [0, 3], [1, 2], [3, 1], [2, 1], [2, 0], [1, 1], [2, 0], [1, 1], [2, 1], [2, 0], [3, 0], [1, 1], [2, 0], [2, 0], [3, 0], [3, 1], [2, 2], [1, 1], [0, 3], [0, 3], [2, 1], [4, 0], [2, 1], [2, 0], [1, 1], [0, 3], [2, 0], [2, 1], [4, 0], [1, 1], [2, 0], [2, 0], [3, 0], [2, 0], [2, 2], [0, 1], [0, 2], [1, 2], [2, 1], [3, 1], [3, 0], [2, 0], [2, 0], [1, 1]], "Alonso": [[2, 0], [1, 1], [2, 1], [1, 2], [1, 1], [1, 0], [1, 1], [2, 0], [0, 2], [2, 1], [0, 1], [0, 3], [2, 0], [4, 0], [3, 0], [3, 0], [1, 1], [0, 2], [1, 1], [2, 1], [1, 2], [1, 0], [1, 1], [1, 2], [4, 0], [2, 0], [2, 1], [0, 3], [0, 4], [1, 1], [2, 1], [2, 0], [3, 0], [2, 1], [2, 0], [1, 0], [1, 0], [2, 1], [3, 0], [1, 1], [2, 0], [2, 0], [3, 0], [4, 0], [1, 1], [1, 1], [0, 2], [0, 3], [2, 0], [4, 0], [2, 1], [2, 0], [1, 1], [0, 2], [2, 0], [2, 1], [3, 0], [1, 1], [2, 0], [3, 0], [2, 0], [2, 0], [1, 1], [1, 1], [0, 2], [1, 2], [2, 1], [2, 0], [3, 0], [1, 0], [2, 0], [2, 1]], "Benigno Gallegos": [[2, 1], [2, 2], [1, 0], [1, 3], [0, 2], [3, 2], [0, 3], [2, 1], [2, 2], [2, 0], [1, 0], [1, 1], [3, 1], [3, 0], [2, 0], [4, 0], [2, 1], [1, 3], [1, 2], [2, 0], [1, 3], [3, 1], [1, 0], [1, 2], [4, 0], [3, 2], [1, 1], [0, 3], [0, 4], [2, 3], [1, 0], [2, 2], [2, 1], [2, 1], [1, 0], [2, 2], [2, 0], [3, 1], [4, 0], [2, 0], [3, 0], [2, 2], [3, 0], [2, 0], [2, 2], [2, 1], [0, 2], [1, 2], [1, 1], [3, 1], [1, 0], [2, 0], [1, 1], [0, 3], [2, 0], [1, 0], [3, 0], [1, 0], [2, 1], [2, 0], [2, 2], [2, 1], [0, 2], [2, 0], [1, 2], [0, 2], [1, 0], [1, 2], [3, 0], [1, 2], [3, 0], [4, 0]], "Bruss Flores": [[2, 1], [1, 2], [1, 0], [2, 2], [2, 1], [2, 1], [2, 0], [2, 1], [0, 0], [0, 1], [1, 3], [1, 1], [2, 1], [2, 0], [1, 1], [2, 0], [1, 0], [1, 1], [2, 1], [2, 1], [2, 0], [2, 0], [0, 0], [1, 1], [4, 1], [2, 1], [3, 2], [1, 2], [0, 3], [1, 2], [2, 2], [2, 1], [3, 0], [2, 1], [2, 1], [1, 0], [2, 1], [1, 1], [2, 1], [1, 1], [1, 2], [1, 0], [5, 1], [2, 1], [3, 1], [1, 1], [1, 3], [1, 2], [2, 1], [4, 0], [2, 1], [2, 0], [1, 1], [0, 3], [2, 0], [2, 1], [3, 1], [0, 1], [1, 1], [0, 0], [2, 0], [4, 0], [1, 2], [2, 2], [0, 3], [0, 4], [3, 1], [2, 0], [3, 0], [2, 1], [1, 1], [1, 1]], "Carlos Gutierrez": [[2, 0], [2, 1], [1, 1], [0, 2], [0, 1], [1, 2], [2, 2], [2, 0], [0, 2], [1, 1], [0, 2], [0, 3], [2, 2], [3, 0], [2, 0], [3, 0], [2, 0], [0, 1], [1, 2], [2, 0], [2, 2], [3, 1], [2, 1], [2, 2], [3, 0], [3, 1], [2, 2], [0, 3], [0, 3], [1, 2], [2, 2], [2, 1], [3, 0], [2, 0], [3, 0], [2, 0], [3, 1], [3, 0], [2, 0], [1, 1], [2, 1], [1, 0], [4, 0], [3, 0], [3, 1], [0, 2], [0, 3], [1, 3], [3, 1], [4, 0], [3, 2], [2, 1], [1, 2], [0, 2], [3, 0], [2, 0], [3, 0], [0, 2], [1, 1], [2, 0], [3, 0], [3, 0], [2, 2], [0, 2], [0, 3], [0, 3], [2, 2], [1, 2], [2, 1], [2, 1], [2, 0], [1, 1]], "Christian Martinez": [[2, 0], [1, 1], [2, 1], [1, 2], [1, 1], [1, 0], [1, 1], [2, 0], [0, 2], [2, 1], [0, 1], [0, 3], [2, 0], [4, 0], [3, 0], [3, 0], [1, 1], [0, 2], [1, 1], [2, 1], [1, 2], [1, 0], [1, 1], [1, 2], [4, 0], [2, 0], [2, 1], [0, 3], [0, 4], [1, 1], [2, 1], [2, 0], [3, 0], [2, 1], [2, 0], [1, 0], [1, 0], [2, 1], [3, 0], [1, 1], [2, 0], [2, 0], [3, 0], [4, 0], [1, 1], [1, 1], [0, 2], [0, 3], [2, 0], [4, 0], [2, 1], [2, 0], [1, 1], [0, 2], [2, 0], [2, 1], [3, 0], [1, 1], [2, 0], [3, 0], [2, 0], [2, 0], [1, 1], [1, 1], [0, 2], [1, 2], [2, 1], [2, 0], [3, 0], [1, 0], [2, 0], [2, 1]], "Derick Guzman": [[2, 0], [2, 1], [1, 0], [0, 1], [0, 1], [1, 1], [2, 0], [2, 0], [1, 1], [2, 1], [0, 1], [0, 2], [1, 0], [3, 0], [3, 0], [2, 0], [1, 1], [0, 1], [1, 1], [1, 0], [0, 1], [1, 0], [0, 0], [0, 2], [5, 0], [3, 1], [2, 1], [0, 2], [0, 2], [0, 2], [1, 2], [2, 1], [2, 0], [1, 0], [1, 0], [1, 0], [2, 1], [1, 0], [3, 0], [1, 1], [2, 0], [2, 0], [3, 0], [2, 0], [2, 1], [1, 1], [0, 3], [0, 2], [2, 1], [3, 0], [2, 1], [2, 0], [0, 1], [0, 2], [3, 0], [2, 1], [2, 0], [1, 1], [2, 0], [2, 0], [2, 0], [3, 0], [1, 1], [1, 1], [0, 2], [0, 2], [2, 1], [2, 0], [3, 0], [1, 1], [2, 0], [2, 1]], "Gonzalo Romero": [[2, 1], [1, 1], [2, 1], [0, 2], [1, 2], [1, 1], [1, 1], [2, 0], [0, 2], [2, 1], [1, 2], [0, 2], [2, 1], [3, 0], [2, 0], [3, 0], [1, 1], [0, 1], [1, 1], [2, 1], [1, 2], [1, 1], [1, 1], [1, 2], [5, 0], [2, 1], [2, 0], [0, 2], [0, 3], [1, 1], [1, 2], [2, 1], [3, 0], [1, 0], [2, 0], [2, 0], [2, 0], [3, 1], [4, 1], [1, 1], [2, 0], [2, 1], [3, 0], [3, 0], [1, 1], [1, 1], [1, 1], [0, 2], [2, 1], [4, 0], [2, 1], [3, 0], [1, 1], [0, 2], [3, 1], [2, 0], [5, 0], [1, 2], [2, 0], [2, 1], [2, 0], [4, 0], [2, 1], [1, 1], [2, 1], [1, 3], [1, 1], [2, 0], [4, 0], [1, 2], [3, 0], [2, 0]], "Jorge Ramos": [[2, 1], [1, 1], [2, 0], [1, 2], [1, 1], [2, 0], [2, 0], [3, 0], [1, 2], [1, 3], [1, 4], [0, 2], [2, 1], [3, 0], [3, 2], [2, 0], [1, 1], [1, 3], [1, 2], [1, 2], [1, 3], [2, 1], [1, 0], [1, 1], [3, 0], [3, 1], [3, 2], [1, 3], [1, 2], [2, 3], [2, 3], [2, 0], [2, 1], [3, 1], [2, 1], [1, 2], [1, 0], [2, 1], [2, 1], [1, 1], [1, 2], [1, 1], [3, 0], [2, 1], [3, 2], [0, 2], [2, 3], [2, 1], [3, 1], [4, 1], [3, 1], [2, 1], [2, 3], [1, 3], [2, 0], [2, 1], [3, 0], [1, 2], [2, 2], [2, 0], [2, 1], [3, 0], [1, 1], [2, 1], [1, 3], [1, 2], [2, 1], [3, 0], [3, 1], [2, 1], [3, 0], [2, 0]], "Luis Polo": [[2, 0], [2, 1], [1, 1], [1, 2], [0, 2], [1, 1], [2, 1], [2, 0], [1, 1], [2, 1], [1, 2], [0, 2], [2, 1], [4, 0], [2, 0], [3, 0], [1, 1], [0, 2], [2, 1], [2, 0], [1, 1], [1, 0], [1, 2], [1, 2], [4, 0], [2, 0], [2, 1], [0, 2], [0, 2], [1, 1], [2, 1], [1, 1], [2, 0], [1, 1], [2, 0], [2, 1], [2, 1], [2, 0], [3, 0], [1, 1], [2, 0], [2, 0], [3, 0], [3, 0], [1, 1], [1, 1], [0, 2], [0, 2], [2, 1], [3, 0], [2, 1], [2, 0], [1, 1], [1, 2], [2, 0], [2, 1], [3, 0], [1, 1], [2, 0], [2, 0], [3, 0], [2, 0], [1, 1], [1, 1], [1, 2], [0, 2], [2, 1], [2, 0], [3, 0], [1, 1], [2, 0], [2, 1]], "P.P.-san": [[2, 1], [1, 1], [2, 1], [1, 2], [1, 1], [1, 0], [2, 1], [2, 0], [1, 2], [2, 1], [1, 2], [0, 2], [2, 1], [3, 0], [2, 0], [2, 0], [2, 1], [0, 2], [2, 1], [2, 1], [1, 2], [1, 2], [2, 2], [2, 1], [3, 0], [2, 1], [2, 1], [0, 2], [0, 3], [2, 1], [2, 1], [2, 0], [2, 0], [2, 1], [2, 1], [1, 1], [2, 1], [2, 0], [3, 0], [2, 1], [2, 0], [2, 0], [3, 0], [2, 0], [2, 1], [1, 2], [0, 2], [1, 2], [2, 1], [3, 0], [2, 1], [2, 0], [1, 2], [0, 3], [2, 0], [2, 0], [3, 0], [1, 2], [2, 0], [2, 0], [2, 0], [2, 0], [2, 1], [2, 0], [0, 2], [1, 3], [2, 1], [2, 0], [3, 0], [2, 1], [2, 0], [2, 1]], "PINC😊": [[2, 1], [1, 0], [3, 2], [1, 2], [1, 1], [1, 0], [3, 1], [1, 2], [2, 3], [1, 1], [0, 2], [0, 2], [3, 1], [4, 0], [2, 1], [2, 1], [1, 1], [0, 2], [0, 2], [1, 1], [2, 1], [1, 1], [3, 1], [2, 1], [3, 1], [2, 0], [2, 2], [1, 1], [1, 2], [1, 2], [2, 2], [1, 2], [2, 1], [2, 1], [3, 1], [2, 1], [1, 1], [2, 1], [2, 1], [3, 2], [0, 2], [1, 1], [3, 0], [2, 0], [2, 2], [1, 1], [0, 2], [1, 3], [3, 1], [2, 0], [3, 0], [2, 1], [1, 1], [1, 2], [3, 0], [2, 0], [2, 1], [1, 0], [1, 1], [2, 1], [3, 1], [4, 0], [1, 1], [0, 2], [0, 3], [0, 3], [2, 3], [2, 2], [2, 1], [3, 1], [2, 1], [1, 1]], "Euler": [[2, 1], [2, 0], [1, 1], [0, 2], [0, 2], [1, 1], [2, 1], [3, 2], [0, 2], [2, 0], [0, 1], [0, 2], [2, 1], [4, 0], [2, 0], [3, 0], [2, 1], [0, 3], [2, 0], [2, 1], [2, 1], [1, 0], [1, 1], [1, 2], [4, 0], [2, 0], [2, 1], [0, 2], [0, 3], [1, 2], [1, 2], [2, 1], [2, 0], [2, 1], [3, 1], [2, 0], [2, 1], [3, 1], [2, 0], [1, 0], [2, 0], [1, 0], [3, 0], [2, 0], [2, 1], [1, 2], [1, 3], [0, 2], [3, 0], [4, 0], [2, 1], [2, 0], [2, 1], [0, 2], [2, 0], [1, 1], [4, 0], [1, 2], [2, 1], [2, 0], [2, 0], [3, 0], [2, 2], [1, 1], [1, 3], [0, 2], [2, 1], [2, 0], [3, 0], [1, 0], [3, 0], [2, 0]]};
+
+
+const STORAGE_KEY = 'pm2026_results';
+let RESULTS = new Array(MATCHES.length).fill(null); // [golL, golV] or null
+
+function ptsForMatch(pred, real) {
+  if (!real) return 0;
+  const [pl, pv] = pred;
+  const [rl, rv] = real;
+  if (pl === rl && pv === rv) return 5;
+  const predRes = Math.sign(pl - pv); // 1 local, -1 visit, 0 draw
+  const realRes = Math.sign(rl - rv);
+  if (predRes === realRes) return 3;
+  return 0;
+}
+
+function computeRanking() {
+  const rows = Object.entries(PREDS).map(([name, preds]) => {
+    let total = 0, exact = 0, result = 0, miss = 0, played = 0;
+    preds.forEach((p, i) => {
+      const r = RESULTS[i];
+      if (!r) return;
+      played++;
+      const pt = ptsForMatch(p, r);
+      total += pt;
+      if (pt === 5) exact++;
+      else if (pt === 3) result++;
+      else miss++;
+    });
+    return { name, total, exact, result, miss, played };
+  });
+  rows.sort((a, b) => b.total - a.total || b.exact - a.exact);
+  return rows;
+}
+
+function renderRanking() {
+  const rows = computeRanking();
+  const medals = ['🥇', '🥈', '🥉'];
+  let html = '<table class="pm-rank"><thead><tr><th></th><th>Participante</th><th style="text-align:right">Pts</th></tr></thead><tbody>';
+  rows.forEach((r, i) => {
+    html += `<tr>
+      <td class="pos">${medals[i] || (i+1)}</td>
+      <td>
+        <div class="pm-name-pts">
+          <span>${r.name}</span>
+        </div>
+        <div class="pm-detail-row"><span>✅ Exactos: ${r.exact} · 🎯 Resultado: ${r.result} · ❌ ${r.miss}</span></div>
+      </td>
+      <td class="pts">${r.total}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('pm-view-ranking').innerHTML = html;
+}
+
+function renderProgress() {
+  const played = RESULTS.filter(r => r).length;
+  document.getElementById('pm-progress').textContent =
+    `⚽ Partidos registrados: ${played} / ${MATCHES.length}`;
+}
+
+function renderPartidos() {
+  let html = '';
+  let currentGroup = null;
+  MATCHES.forEach((m, i) => {
+    const [group, home, away] = m;
+    if (group !== currentGroup) {
+      html += `<div class="pm-group-title">${group}</div>`;
+      currentGroup = group;
+    }
+    const r = RESULTS[i] || ['', ''];
+    const played = RESULTS[i] ? '<span class="pm-played-badge">FT</span>' : '';
+    html += `<div class="pm-match">
+      <span class="pm-team">${home}</span>
+      <input class="pm-score-input" type="number" min="0" max="20" data-idx="${i}" data-side="0" value="${r[0]}">
+      <span class="pm-vs">-</span>
+      <input class="pm-score-input" type="number" min="0" max="20" data-idx="${i}" data-side="1" value="${r[1]}">
+      <span class="pm-team right">${away}</span>
+      ${played}
+    </div>`;
+  });
+  html += `<button class="pm-clear-btn" id="pm-clear-all">Borrar todos los resultados</button>`;
+  document.getElementById('pm-view-partidos').innerHTML = html;
+
+  document.querySelectorAll('.pm-score-input').forEach(inp => {
+    inp.addEventListener('change', onScoreChange);
+  });
+  document.getElementById('pm-clear-all').addEventListener('click', async () => {
+    if (!confirm('¿Borrar todos los resultados ingresados?')) return;
+    RESULTS = new Array(MATCHES.length).fill(null);
+    await saveResults();
+    renderAll();
+  });
+}
+
+async function onScoreChange(e) {
+  const idx = parseInt(e.target.dataset.idx);
+  const side = parseInt(e.target.dataset.side);
+  const val = e.target.value;
+
+  if (!RESULTS[idx]) RESULTS[idx] = [null, null];
+  RESULTS[idx][side] = val === '' ? null : parseInt(val);
+
+  if (RESULTS[idx][0] === null || RESULTS[idx][1] === null) {
+    if (RESULTS[idx][0] === null && RESULTS[idx][1] === null) RESULTS[idx] = null;
+  }
+  await saveResults();
+  renderRanking();
+  renderProgress();
+}
+
+async function saveResults() {
+  const data = JSON.stringify(RESULTS);
+  try {
+    localStorage.setItem(STORAGE_KEY, data);
+  } catch (err) {
+    console.error('Error guardando en localStorage', err);
+  }
+  try {
+    await pmDb.ref('results').set(RESULTS);
+  } catch (err) {
+    console.error('Error guardando en Firebase', err);
+  }
+}
+
+async function loadResults() {
+  try {
+    const local = localStorage.getItem(STORAGE_KEY);
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed) && parsed.length === MATCHES.length) {
+        RESULTS = parsed;
+      }
+    }
+  } catch (err) {}
+}
+
+function listenResults() {
+  pmDb.ref('results').on('value', (snapshot) => {
+    const val = snapshot.val();
+    if (Array.isArray(val) && val.length === MATCHES.length) {
+      RESULTS = val;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(RESULTS)); } catch (err) {}
+      renderAll();
+    }
+  });
+}
+
+function renderAll() {
+  renderRanking();
+  renderPartidos();
+  renderProgress();
+}
+
+document.querySelectorAll('.pm-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.pm-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.tab;
+    document.getElementById('pm-view-ranking').style.display = target === 'ranking' ? 'block' : 'none';
+    document.getElementById('pm-view-partidos').style.display = target === 'partidos' ? 'block' : 'none';
+  });
+});
+
+(async () => {
+  await loadResults();
+  renderAll();
+  listenResults();
+})();
+</script>
